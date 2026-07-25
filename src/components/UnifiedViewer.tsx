@@ -60,18 +60,11 @@ export function UnifiedViewer({
   const [rotation, setRotation] = useState(0);
   const [fitMode, setFitMode] = useState<'width' | 'auto'>('width');
   const [gridCols, setGridCols] = useState(isMobile ? 3 : 5);
-  const [swapPageA, setSwapPageA] = useState('');
-  const [swapPageB, setSwapPageB] = useState('');
   const lastReportedPageRef = useRef(1);
   const lastHandledScrollToRef = useRef<number | null>(null);
 
   const isGrid = layout === 'grid';
   const cols = isGrid ? gridCols : layout === 'single' ? 1 : layout === 'double' ? 2 : 3;
-
-  const swapANum = parseInt(swapPageA, 10);
-  const swapBNum = parseInt(swapPageB, 10);
-  const canSwap = !isNaN(swapANum) && swapANum >= 1 && swapANum <= numPages &&
-    !isNaN(swapBNum) && swapBNum >= 1 && swapBNum <= numPages && swapANum !== swapBNum;
 
   // ── Init ──────────────────────────────────────────────────
   useEffect(() => {
@@ -301,24 +294,7 @@ export function UnifiedViewer({
           </>
         )}
 
-        {/* Reorder swap controls */}
-        {isReorderMode && (
-          <>
-            <div className="w-px h-5 bg-zinc-700 shrink-0" />
-            <input type="number" min={1} max={numPages} value={swapPageA} onChange={e => setSwapPageA(e.target.value)}
-              placeholder="A" className="w-14 h-9 px-2 text-sm font-mono bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 text-center shrink-0 focus:outline-none focus:border-amber-500" />
-            <svg className="w-4 h-4 text-zinc-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            <input type="number" min={1} max={numPages} value={swapPageB} onChange={e => setSwapPageB(e.target.value)}
-              placeholder="B" className="w-14 h-9 px-2 text-sm font-mono bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 text-center shrink-0 focus:outline-none focus:border-amber-500" />
-            <button onClick={() => { if (canSwap && onReorderSwap) { onReorderSwap(swapANum, swapBNum); setSwapPageA(''); setSwapPageB(''); } }}
-              disabled={!canSwap}
-              className="h-9 px-3 text-xs font-semibold text-amber-300 bg-amber-600/20 hover:bg-amber-600/30 active:bg-amber-600/40 border border-amber-600/30 rounded-lg disabled:opacity-30 shrink-0 transition-colors">
-              Swap
-            </button>
-          </>
-        )}
+        {/* Reorder swap controls — moved to floating swap bar in App */}
 
         <div className="flex-1" />
 
@@ -621,14 +597,17 @@ function GridView({
 
 function GridCanvas({ pdf, pageNumber, scale }: { pdf: PDFDocument; pageNumber: number; scale: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderedRef = useRef(false);
+  const lastRenderedRef = useRef<{ page?: number; scale?: number }>({});
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || renderedRef.current) return;
-    renderedRef.current = true;
+    if (!canvas) return;
+    const last = lastRenderedRef.current;
+    if (last.page === pageNumber && last.scale === scale) return;
+    lastRenderedRef.current = { page: pageNumber, scale };
     renderPageToCanvas(pdf, pageNumber, canvas, scale).catch(() => {});
   }, [pdf, pageNumber, scale]);
 
-  return <canvas ref={canvasRef} className="block bg-white w-full h-full" />;
+  // !w-full !h-full override inline pixel sizes set by renderPageToCanvas
+  return <canvas ref={canvasRef} className="block bg-white !w-full !h-full" />;
 }
