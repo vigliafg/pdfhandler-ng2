@@ -209,17 +209,17 @@ export function UnifiedViewer({
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950">
       {/* ── Unified Toolbar ────────────────────────────────── */}
-      <div className="flex items-center gap-1 md:gap-1.5 px-2 py-1.5 bg-zinc-900 border-b border-zinc-800 shrink-0 overflow-x-auto scrollbar-thin">
+      <div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 px-1.5 sm:px-2 py-1 sm:py-1.5 bg-zinc-900 border-b border-zinc-800 shrink-0 overflow-x-auto scrollbar-thin">
 
         {/* Layout mode */}
         <div className="flex items-center bg-zinc-800 rounded-lg p-0.5 border border-zinc-700 shrink-0">
           {LAYOUT_MODES.map(lm => (
             <button key={lm.id} onClick={() => { setLayout(lm.id); setFitMode('width'); }}
-              className={`min-w-[44px] min-h-[44px] px-1.5 py-0.5 rounded-md transition-all ${
+              className={`min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] px-1 sm:px-1.5 py-0.5 rounded-md transition-all ${
                 layout === lm.id ? 'bg-zinc-100 text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 active:bg-zinc-700'
               }`}
               title={lm.label} aria-label={lm.label}>
-              <svg className="w-4 h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d={lm.icon} />
               </svg>
             </button>
@@ -231,7 +231,7 @@ export function UnifiedViewer({
           <div className="flex items-center bg-zinc-800 rounded-lg p-0.5 border border-zinc-700 shrink-0">
             {(isMobile ? [2, 3, 4] : [3, 4, 5, 6]).map(n => (
               <button key={n} onClick={() => setGridCols(n)}
-                className={`min-w-[36px] min-h-[36px] px-2 py-1 text-xs font-semibold rounded-md transition-all ${
+                className={`min-w-[28px] sm:min-w-[36px] min-h-[28px] sm:min-h-[36px] px-1 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold rounded-md transition-all ${
                   gridCols === n ? 'bg-zinc-100 text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 active:bg-zinc-700'
                 }`}>{n}</button>
             ))}
@@ -241,22 +241,22 @@ export function UnifiedViewer({
 
         {/* Zoom (hidden in grid mode) */}
         {!isGrid && <>
-          <button onClick={zoomOut} className="min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Zoom out" aria-label="Zoom out">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M5 12h14"/></svg>
+          <button onClick={zoomOut} className="min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Zoom out" aria-label="Zoom out">
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M5 12h14"/></svg>
           </button>
           <button onClick={() => setFitMode(f => f === 'width' ? 'auto' : 'width')}
-            className="min-h-[44px] px-1.5 text-xs tabular-nums text-zinc-300 text-center select-none font-mono rounded-lg hover:bg-zinc-800 active:bg-zinc-700 shrink-0">
+            className="min-h-[36px] sm:min-h-[44px] px-1 sm:px-1.5 text-[10px] sm:text-xs tabular-nums text-zinc-300 text-center select-none font-mono rounded-lg hover:bg-zinc-800 active:bg-zinc-700 shrink-0">
             {zoomLabel}
           </button>
-          <button onClick={zoomIn} className="min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Zoom in" aria-label="Zoom in">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M12 5v14M5 12h14"/></svg>
+          <button onClick={zoomIn} className="min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Zoom in" aria-label="Zoom in">
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M12 5v14M5 12h14"/></svg>
           </button>
-          <div className="w-px h-5 bg-zinc-700 shrink-0" />
+          <div className="w-px h-4 sm:h-5 bg-zinc-700 shrink-0" />
           <button onClick={handleFitWidth}
-            className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors active:bg-zinc-700 shrink-0 ${
+            className={`min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] flex items-center justify-center rounded-lg transition-colors active:bg-zinc-700 shrink-0 ${
               fitMode === 'width' ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-zinc-200'
             }`} title="Fit width" aria-label="Fit to width">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
             </svg>
           </button>
@@ -264,52 +264,52 @@ export function UnifiedViewer({
 
         {/* Rotation */}
         {!isGrid && <>
-          <div className="w-px h-5 bg-zinc-700 shrink-0" />
-          <button onClick={rotateCCW} className="min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Rotate left" aria-label="Rotate left">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4M3 10l4 4"/></svg>
+          <div className="w-px h-4 sm:h-5 bg-zinc-700 shrink-0" />
+          <button onClick={rotateCCW} className="min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Rotate left" aria-label="Rotate left">
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4M3 10l4 4"/></svg>
           </button>
-          <button onClick={rotateCW} className="min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Rotate right" aria-label="Rotate right">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4"/></svg>
+          <button onClick={rotateCW} className="min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Rotate right" aria-label="Rotate right">
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4"/></svg>
           </button>
         </>}
 
-        <div className={isGrid ? 'flex-1' : 'w-px h-5 bg-zinc-700 shrink-0'} />
+        <div className={isGrid ? 'flex-1 hidden sm:block' : 'w-px h-5 bg-zinc-700 shrink-0'} />
 
         {/* ── SELECT toggle ─────────────────────────────────── */}
-        <button onClick={toggleSelectMode}
-          className={`min-h-[44px] px-3 py-1 text-xs font-semibold rounded-lg transition-all shrink-0 border ${
+        <button onClick={toggleSelectMode} title="Select"
+          className={`min-h-[32px] sm:min-h-[44px] px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold rounded-lg transition-all shrink-0 border ${
             selectMode
               ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-500/20'
               : 'text-zinc-400 border-zinc-700 hover:text-zinc-200 hover:border-zinc-600 active:bg-zinc-700'
           }`}>
-          ✂️ Select
+          ✂️ <span className="hidden sm:inline">Select</span>
         </button>
 
         {/* Selection actions (visible when selectMode is active) */}
         {selectMode && (
           <>
             {selectedCount > 0 && (
-              <span className="text-xs text-blue-400 font-semibold tabular-nums shrink-0">{selectedCount} sel.</span>
+              <span className="text-[10px] sm:text-xs text-blue-400 font-semibold tabular-nums shrink-0">{selectedCount}</span>
             )}
-            <button onClick={onSelectAll} className="min-w-[44px] min-h-[36px] px-2 py-1 text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg transition-colors shrink-0">All</button>
+            <button onClick={onSelectAll} className="min-w-[32px] sm:min-w-[44px] min-h-[28px] sm:min-h-[36px] px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg transition-colors shrink-0">All</button>
             <button onClick={onDeselectAll} disabled={selectedCount === 0}
-              className="min-w-[44px] min-h-[36px] px-2 py-1 text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg transition-colors disabled:opacity-30 shrink-0">None</button>
+              className="min-w-[32px] sm:min-w-[44px] min-h-[28px] sm:min-h-[36px] px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg transition-colors disabled:opacity-30 shrink-0">None</button>
           </>
         )}
 
         {/* Reorder swap controls — moved to floating swap bar in App */}
 
-        <div className="flex-1" />
+        <div className="flex-1 hidden sm:block" />
 
         {/* Page navigation */}
         <button onClick={prevPage} disabled={currentPage <= 1}
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors disabled:opacity-30 active:bg-zinc-700 shrink-0" title="Previous" aria-label="Previous page">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          className="min-w-[32px] sm:min-w-[44px] min-h-[32px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors disabled:opacity-30 active:bg-zinc-700 shrink-0" title="Previous" aria-label="Previous page">
+          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
         </button>
-        <span className="text-xs tabular-nums text-zinc-400 whitespace-nowrap select-none shrink-0">{currentPage} / {numPages}</span>
+        <span className="text-[10px] sm:text-xs tabular-nums text-zinc-400 whitespace-nowrap select-none shrink-0">{currentPage}/{numPages}</span>
         <button onClick={nextPage} disabled={currentPage >= numPages}
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors disabled:opacity-30 active:bg-zinc-700 shrink-0" title="Next" aria-label="Next page">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+          className="min-w-[32px] sm:min-w-[44px] min-h-[32px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors disabled:opacity-30 active:bg-zinc-700 shrink-0" title="Next" aria-label="Next page">
+          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
         </button>
         <PageJumpInput onGo={goToPage} numPages={numPages} />
       </div>
@@ -379,8 +379,8 @@ function PageJumpInput({ onGo, numPages }: { onGo: (p: number) => void; numPages
   return (
     <input type="number" min={1} max={numPages} value={val}
       onChange={e => setVal(e.target.value)} onKeyDown={handleKey}
-      placeholder={`1-${numPages}`}
-      className="w-10 h-8 px-1 text-[11px] font-mono bg-zinc-800 border border-zinc-700 rounded-md text-zinc-200 text-center focus:outline-none focus:border-blue-500 placeholder:text-zinc-600" />
+      placeholder={numPages > 999 ? '…' : String(numPages)}
+      className="w-8 sm:w-10 h-7 sm:h-8 px-0.5 sm:px-1 text-[10px] sm:text-[11px] font-mono bg-zinc-800 border border-zinc-700 rounded-md text-zinc-200 text-center focus:outline-none focus:border-blue-500 placeholder:text-zinc-600" />
   );
 }
 
