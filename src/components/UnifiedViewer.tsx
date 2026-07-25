@@ -84,22 +84,25 @@ export function UnifiedViewer({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const ro = new ResizeObserver((entries) => {
       if (!scrollRef.current) return;
-      // Grid: getBoundingClientRect includes scrollbar area (edge-to-edge fill)
-      // Non-grid: contentRect.width gives float precision for fit-to-width
-      setContainerWidth(isGridRef.current
-        ? scrollRef.current.getBoundingClientRect().width
-        : entries[0]?.contentRect.width ?? scrollRef.current.clientWidth);
+      // Debounce to batch rapid resize events (e.g. smooth window drag)
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        setContainerWidth(isGridRef.current
+          ? scrollRef.current!.getBoundingClientRect().width
+          : entries[0]?.contentRect.width ?? scrollRef.current!.clientWidth);
+      }, 50);
     });
     ro.observe(el);
-    // Initial measure
+    // Initial measure (no debounce)
     if (scrollRef.current) {
       setContainerWidth(isGridRef.current
         ? scrollRef.current.getBoundingClientRect().width
         : scrollRef.current.clientWidth);
     }
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); if (timer) clearTimeout(timer); };
   }, [loaded]);
 
   // ── Scale ────────────────────────────────────────────────
