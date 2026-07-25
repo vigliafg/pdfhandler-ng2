@@ -1,5 +1,6 @@
 name = "pdfhandler-ng2"
 compatibility_date = "2026-07-25"
+compatibility_flags = ["nodejs_compat"]
 
 [assets]
 directory = "./dist"
@@ -7,6 +8,3 @@ not_found_handling = "single-page-application"
 
 [observability]
 enabled = true
-
-[[compatibility_flags]]
-name = "nodejs_compat"
