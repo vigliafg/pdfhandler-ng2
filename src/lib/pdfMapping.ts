@@ -34,8 +34,10 @@ export function updateOutlineAfterMapping<T extends MinimalTOCItem>(
     const result: T[] = [];
     for (const item of itemList) {
       const children = walk(item.children as T[]);
+      // undefined = not in map (unchanged), null = deleted page
+      const mapped = mapping.get(item.pageNumber);
       const newPage = item.pageNumber !== null
-        ? (mapping.get(item.pageNumber) ?? item.pageNumber)
+        ? (mapped !== undefined ? mapped : item.pageNumber)
         : null;
 
       // Remove orphaned bookmarks (deleted page + no children)
