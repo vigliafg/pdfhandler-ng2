@@ -76,7 +76,7 @@ const DOC_TOOLS = [
 // ── App ──────────────────────────────────────────────────────
 
 export default function App() {
-  const { isMobile, isTablet, isDesktop } = useResponsiveLayout();
+  const { isMobile, isDesktop } = useResponsiveLayout();
   const { pdf, pdfBytes, numPages, loading, error, fileName, originalFileName, isModified, loadPDFFromFile, loadPDFFromBytes } = usePDFLoader();
   const { selectedPages, togglePage, selectAll, deselectAll, selectRange, selectedCount } = usePageSelection();
   const reorder = useReorder();
@@ -94,10 +94,17 @@ export default function App() {
   const lastViewerPageRef = useRef(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editorCurrentPage, setEditorCurrentPage] = useState(1);
+  const [swapPageA, setSwapPageA] = useState('');
+  const [swapPageB, setSwapPageB] = useState('');
 
   useEffect(() => { setDrawerOpen(isDesktop); }, [isDesktop]);
 
   const hasPDF = pdf !== null && numPages > 0;
+
+  const swapANum = parseInt(swapPageA, 10);
+  const swapBNum = parseInt(swapPageB, 10);
+  const canSwap = !isNaN(swapANum) && swapANum >= 1 && swapANum <= numPages &&
+    !isNaN(swapBNum) && swapBNum >= 1 && swapBNum <= numPages && swapANum !== swapBNum;
 
   // ── Tool modal state ─────────────────────────────────────
   const tool = useToolState();
@@ -433,6 +440,8 @@ export default function App() {
     setActivePageTool('reorder');
     setSelectMode(true);
     setDrawerOpen(false);
+    setSwapPageA('');
+    setSwapPageB('');
   }, [reorder, numPages]);
 
   // ── Tool dispatch (open modal for page/doc tools) ────────
@@ -481,6 +490,13 @@ export default function App() {
     setEditorCurrentPage(page);
   }, []);
   const handleReorderSwap = useCallback((a: number, b: number) => reorder.swapPages(a, b), [reorder]);
+
+  const handleSwap = useCallback(() => {
+    if (!canSwap) return;
+    reorder.swapPages(swapANum, swapBNum);
+    setSwapPageA('');
+    setSwapPageB('');
+  }, [canSwap, swapANum, swapBNum, reorder]);
 
   // ── Drawer content ────────────────────────────────────────
 
@@ -583,13 +599,30 @@ export default function App() {
         </div>
       )}
 
-      {/* Reorder bar */}
-      {isReorderMode && (isDesktop || isTablet) && (
-        <div className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl animate-slide-up">
-          <span className="text-sm text-amber-400 font-semibold">Reorder</span>
-          <button onClick={() => { setIsReorderMode(false); setActivePageTool(null); }} className="px-3 py-1 text-xs font-medium text-zinc-300 bg-zinc-700 hover:bg-zinc-600 rounded-lg">Cancel</button>
-          <button onClick={handleReorderApply} disabled={executing} className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:bg-amber-800 rounded-lg">
-            {executing ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Applying...</> : 'Apply'}</button>
+      {/* Reorder swap bar — visible on all screen sizes */}
+      {isReorderMode && (
+        <div className="fixed bottom-20 sm:bottom-6 right-2 sm:right-6 left-2 sm:left-auto z-40 flex flex-wrap items-center justify-center sm:justify-end gap-2 px-4 py-2.5 bg-zinc-800 border border-amber-600/30 rounded-xl shadow-2xl animate-slide-up">
+          <span className="text-xs sm:text-sm text-amber-400 font-semibold shrink-0">Swap</span>
+          <input type="number" min={1} max={numPages} value={swapPageA} onChange={e => setSwapPageA(e.target.value)}
+            placeholder="A" className="w-14 h-9 px-2 text-sm font-mono bg-zinc-700 border border-zinc-600 rounded-lg text-zinc-200 text-center shrink-0 focus:outline-none focus:border-amber-500" />
+          <svg className="w-4 h-4 text-zinc-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          <input type="number" min={1} max={numPages} value={swapPageB} onChange={e => setSwapPageB(e.target.value)}
+            placeholder="B" className="w-14 h-9 px-2 text-sm font-mono bg-zinc-700 border border-zinc-600 rounded-lg text-zinc-200 text-center shrink-0 focus:outline-none focus:border-amber-500" />
+          <button onClick={handleSwap} disabled={!canSwap}
+            className="h-9 px-3 text-xs font-semibold text-amber-300 bg-amber-600/20 hover:bg-amber-600/30 active:bg-amber-600/40 border border-amber-600/30 rounded-lg disabled:opacity-30 shrink-0 transition-colors">
+            Swap
+          </button>
+          <div className="w-px h-5 bg-zinc-700 shrink-0 hidden sm:block" />
+          <button onClick={() => { setIsReorderMode(false); setActivePageTool(null); setSelectMode(false); setSwapPageA(''); setSwapPageB(''); }}
+            className="h-9 px-3 text-xs font-medium text-zinc-300 bg-zinc-700 hover:bg-zinc-600 rounded-lg shrink-0 transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleReorderApply} disabled={executing}
+            className="flex items-center gap-1.5 h-9 px-3 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:bg-amber-800 rounded-lg shrink-0 transition-colors">
+            {executing ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Applying...</> : 'Apply'}
+          </button>
         </div>
       )}
 

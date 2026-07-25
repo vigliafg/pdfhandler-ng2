@@ -35,7 +35,7 @@ export function updateOutlineAfterMapping<T extends MinimalTOCItem>(
     for (const item of itemList) {
       const children = walk(item.children as T[]);
       // undefined = not in map (unchanged), null = deleted page
-      const mapped = mapping.get(item.pageNumber);
+      const mapped = item.pageNumber !== null ? mapping.get(item.pageNumber) : undefined;
       const newPage = item.pageNumber !== null
         ? (mapped !== undefined ? mapped : item.pageNumber)
         : null;

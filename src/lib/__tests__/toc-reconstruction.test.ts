@@ -211,10 +211,7 @@ describe('DELETE operations', () => {
 
     // All leaf bookmarks should be removed
     // Only items with children survive (with pageNumber=null)
-    const allPages = tocPageNumbers(updated);
-    // Chapter 1 and Chapter 2 survive because they have children, but pageNumber=null
-    // Their children are also deleted (they're leaf bookmarks in deleted range)
-    // So after children deletion, they become leaf with null → should be removed too
+    // After cascade, Chapter 1 and 2 lose all children and get removed too
     
     // Actually, since ALL their children point to deleted pages and are leaves,
     // after children are removed, Chapter 1 and 2 become leaves with null → removed
@@ -313,7 +310,7 @@ describe('REORDER / SWAP operations', () => {
   // #129 — Move first page to end (global offset −1)
   it('#129: Move first page to end → all TOC entries offset −1', () => {
     const toc = modernTOC();
-    const totalPages = 300;
+    const total = 300;
 
     const newOrder: number[] = [];
     for (let i = 2; i <= totalPages; i++) newOrder.push(i);

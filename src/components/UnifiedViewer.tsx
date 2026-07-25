@@ -46,7 +46,7 @@ export function UnifiedViewer({
   selectMode, onSelectModeChange,
   selectedPages, selectedCount, onTogglePage, onRangeSelect,
   onSelectAll, onDeselectAll, onViewPage, initialPage,
-  isReorderMode, pageOrder, onReorderSwap,
+  isReorderMode, pageOrder,
 }: UnifiedViewerProps) {
   const { isMobile } = useResponsiveLayout();
   const scrollRef = useRef<HTMLDivElement>(null);
