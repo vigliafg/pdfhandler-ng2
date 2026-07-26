@@ -1,6 +1,9 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
-import { renderPageToCanvas, getFirstPageDimensions, clearPageDimensionsCache } from '../lib/pdfRenderer';
+import { getFirstPageDimensions, clearPageDimensionsCache } from '../lib/pdfRenderer';
+import { renderPageWithCache, clearBitmapCache } from '../lib/bitmapCache';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { PDFDocument } from '../lib/pdfRenderer';
 
 type LayoutMode = 'single' | 'double' | 'triple' | 'grid';
@@ -25,6 +28,9 @@ interface UnifiedViewerProps {
   isReorderMode: boolean;
   pageOrder: number[];
   onReorderSwap?: (pageA: number, pageB: number) => void;
+  rotation: number;
+  onRotateCW: () => void;
+  onRotateCCW: () => void;
 }
 
 const PAGE_GAP = 12;
@@ -47,8 +53,9 @@ export function UnifiedViewer({
   selectedPages, selectedCount, onTogglePage, onRangeSelect,
   onSelectAll, onDeselectAll, onViewPage, initialPage,
   isReorderMode, pageOrder,
+  rotation, onRotateCW, onRotateCCW,
 }: UnifiedViewerProps) {
-  const { isMobile } = useResponsiveLayout();
+  const { isMobile, isCompact } = useResponsiveLayout();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pageWidth, setPageWidth] = useState(595);
   const [pageHeight, setPageHeight] = useState(842);
@@ -57,7 +64,6 @@ export function UnifiedViewer({
   const [currentPage, setCurrentPage] = useState(1);
   const [layout, setLayout] = useState<LayoutMode>(isMobile ? 'single' : 'single');
   const [zoom, setZoom] = useState(100);
-  const [rotation, setRotation] = useState(0);
   const [fitMode, setFitMode] = useState<'width' | 'auto'>('width');
   const [gridCols, setGridCols] = useState(isMobile ? 3 : 5);
   const lastReportedPageRef = useRef(1);
@@ -69,6 +75,7 @@ export function UnifiedViewer({
   // ── Init ──────────────────────────────────────────────────
   useEffect(() => {
     clearPageDimensionsCache();
+    clearBitmapCache();
     getFirstPageDimensions(pdf).then((dims) => {
       setPageWidth(dims.width);
       setPageHeight(dims.height);
@@ -158,8 +165,6 @@ export function UnifiedViewer({
   const zoomIn  = () => { setFitMode('auto'); setZoom(z => Math.min(400, z + 25)); };
   const zoomOut = () => { setFitMode('auto'); setZoom(z => Math.max(25, z - 25)); };
   const handleFitWidth = () => setFitMode('width');
-  const rotateCW  = () => setRotation(r => (r + 90) % 360);
-  const rotateCCW = () => setRotation(r => (r + 270) % 360);
 
   // ── Page navigation ──────────────────────────────────────
   const goToPage = useCallback((page: number) => {
@@ -211,20 +216,24 @@ export function UnifiedViewer({
       {/* ── Unified Toolbar ────────────────────────────────── */}
       <div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 px-1.5 sm:px-2 py-1 sm:py-1.5 bg-zinc-900 border-b border-zinc-800 shrink-0 overflow-x-auto scrollbar-thin">
 
-        {/* Layout mode */}
-        <div className="flex items-center bg-zinc-800 rounded-lg p-0.5 border border-zinc-700 shrink-0">
-          {LAYOUT_MODES.map(lm => (
-            <button key={lm.id} onClick={() => { setLayout(lm.id); setFitMode('width'); }}
-              className={`min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] px-1 sm:px-1.5 py-0.5 rounded-md transition-all ${
-                layout === lm.id ? 'bg-zinc-100 text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 active:bg-zinc-700'
-              }`}
-              title={lm.label} aria-label={lm.label}>
-              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d={lm.icon} />
-              </svg>
-            </button>
-          ))}
-        </div>
+        {/* Layout mode — dropdown on compact, buttons on desktop */}
+        {isCompact ? (
+          <LayoutDropdown layout={layout} onSelect={(id) => { setLayout(id); setFitMode('width'); }} />
+        ) : (
+          <div className="flex items-center bg-zinc-800 rounded-lg p-0.5 border border-zinc-700 shrink-0">
+            {LAYOUT_MODES.map(lm => (
+              <button key={lm.id} onClick={() => { setLayout(lm.id); setFitMode('width'); }}
+                className={`min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] px-1 sm:px-1.5 py-0.5 rounded-md transition-all ${
+                  layout === lm.id ? 'bg-zinc-100 text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 active:bg-zinc-700'
+                }`}
+                title={lm.label} aria-label={lm.label}>
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d={lm.icon} />
+                </svg>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Grid columns (only in grid mode) */}
         {isGrid && (
@@ -262,40 +271,45 @@ export function UnifiedViewer({
           </button>
         </>}
 
-        {/* Rotation */}
-        {!isGrid && <>
+        {/* Rotation (desktop only, hidden in grid) */}
+        {!isCompact && !isGrid && <>
           <div className="w-px h-4 sm:h-5 bg-zinc-700 shrink-0" />
-          <button onClick={rotateCCW} className="min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Rotate left" aria-label="Rotate left">
+          <button onClick={onRotateCCW} className="min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Rotate left" aria-label="Rotate left">
             <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4M3 10l4 4"/></svg>
           </button>
-          <button onClick={rotateCW} className="min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Rotate right" aria-label="Rotate right">
+          <button onClick={onRotateCW} className="min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors active:bg-zinc-700 shrink-0" title="Rotate right" aria-label="Rotate right">
             <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4"/></svg>
           </button>
         </>}
 
-        <div className={isGrid ? 'flex-1 hidden sm:block' : 'w-px h-5 bg-zinc-700 shrink-0'} />
-
-        {/* ── SELECT toggle ─────────────────────────────────── */}
-        <button onClick={toggleSelectMode} title="Select"
-          className={`min-h-[32px] sm:min-h-[44px] px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold rounded-lg transition-all shrink-0 border ${
-            selectMode
-              ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-500/20'
-              : 'text-zinc-400 border-zinc-700 hover:text-zinc-200 hover:border-zinc-600 active:bg-zinc-700'
-          }`}>
-          ✂️ <span className="hidden sm:inline">Select</span>
-        </button>
-
-        {/* Selection actions (visible when selectMode is active) */}
-        {selectMode && (
+        {/* ── SELECT toggle (desktop only) ─────────────────── */}
+        {!isCompact && (
           <>
-            {selectedCount > 0 && (
-              <span className="text-[10px] sm:text-xs text-blue-400 font-semibold tabular-nums shrink-0">{selectedCount}</span>
+            <div className={isGrid ? 'flex-1 hidden sm:block' : 'w-px h-5 bg-zinc-700 shrink-0'} />
+
+            <button onClick={toggleSelectMode} title="Select"
+              className={`min-h-[32px] sm:min-h-[44px] px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold rounded-lg transition-all shrink-0 border ${
+                selectMode
+                  ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-500/20'
+                  : 'text-zinc-400 border-zinc-700 hover:text-zinc-200 hover:border-zinc-600 active:bg-zinc-700'
+              }`}>
+              ✂️ <span className="hidden sm:inline">Select</span>
+            </button>
+
+            {/* Selection actions (visible when selectMode is active) */}
+            {selectMode && (
+              <>
+                {selectedCount > 0 && (
+                  <span className="text-[10px] sm:text-xs text-blue-400 font-semibold tabular-nums shrink-0">{selectedCount}</span>
+                )}
+                <button onClick={onSelectAll} className="min-w-[32px] sm:min-w-[44px] min-h-[28px] sm:min-h-[36px] px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg transition-colors shrink-0">All</button>
+                <button onClick={onDeselectAll} disabled={selectedCount === 0}
+                  className="min-w-[32px] sm:min-w-[44px] min-h-[28px] sm:min-h-[36px] px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg transition-colors disabled:opacity-30 shrink-0">None</button>
+              </>
             )}
-            <button onClick={onSelectAll} className="min-w-[32px] sm:min-w-[44px] min-h-[28px] sm:min-h-[36px] px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg transition-colors shrink-0">All</button>
-            <button onClick={onDeselectAll} disabled={selectedCount === 0}
-              className="min-w-[32px] sm:min-w-[44px] min-h-[28px] sm:min-h-[36px] px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg transition-colors disabled:opacity-30 shrink-0">None</button>
           </>
         )}
+        {isCompact && isGrid && <div className="flex-1" />}
 
         {/* Reorder swap controls — moved to floating swap bar in App */}
 
@@ -332,7 +346,9 @@ export function UnifiedViewer({
               pageWidth={pageWidth}
               pageHeight={pageHeight}
               scale={effectiveScale}
+              rowH={rowH}
               pdf={pdf}
+              scrollRef={scrollRef}
               selectedPages={selectedPages}
               selectMode={selectMode}
               isReorderMode={isReorderMode}
@@ -362,6 +378,62 @@ export function UnifiedViewer({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Layout dropdown (compact screens) ──────────────────────
+
+function LayoutDropdown({ layout, onSelect }: { layout: LayoutMode; onSelect: (id: LayoutMode) => void }) {
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const current = LAYOUT_MODES.find(l => l.id === layout)!;
+
+  useLayoutEffect(() => {
+    if (open && btnRef.current) setRect(btnRef.current.getBoundingClientRect());
+    if (!open) setRect(null);
+  }, [open]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || dropdownRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative shrink-0">
+      <button ref={btnRef} onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 min-w-[36px] min-h-[36px] px-1.5 py-0.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-200 transition-colors">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d={current.icon} />
+        </svg>
+        <svg className="w-3 h-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && rect && createPortal(
+        <div ref={dropdownRef} className="fixed z-40 w-36 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 animate-slide-up"
+          style={{ top: rect.bottom + 4, left: rect.left }}>
+          {LAYOUT_MODES.map(lm => (
+            <button key={lm.id} onClick={() => { onSelect(lm.id); setOpen(false); }}
+              className={`flex items-center gap-2 w-full px-3 py-2 text-xs font-medium transition-colors ${
+                layout === lm.id ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
+              }`}>
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d={lm.icon} />
+              </svg>
+              {lm.label}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -461,7 +533,7 @@ function PageView({
       canvas.style.width = `${canvasW}px`;
       canvas.style.height = `${canvasH}px`;
       canvas.style.display = 'block';
-      renderPageToCanvas(pdf, p + 1, canvas, scale).catch(() => {});
+      renderPageWithCache(pdf, p + 1, canvas, scale).catch(() => {});
     }
   }, [pdf, scale, rowH, numPages, cols, scrollRef, canvasW, canvasH, colStep]);
 
@@ -536,20 +608,30 @@ function PageView({
   );
 }
 
-// ── Grid View (thumbnail grid, replaces EditorPanel) ────────
+// ── Grid View (virtual scrolling) ─────────────────────────
 
 function GridView({
-  displayOrder, cols, pageWidth, pageHeight, scale, pdf,
-  selectedPages, selectMode, isReorderMode, onTogglePage, onRangeSelect,
-  onViewPage, lastClickedRef,
+  displayOrder, cols, pageWidth, pageHeight, scale, rowH, pdf,
+  scrollRef, selectedPages, selectMode, isReorderMode,
+  onTogglePage, onRangeSelect, onViewPage, lastClickedRef,
 }: {
   displayOrder: number[]; cols: number;
-  pageWidth: number; pageHeight: number; scale: number;
-  pdf: PDFDocument; selectedPages: Set<number>; selectMode: boolean;
+  pageWidth: number; pageHeight: number; scale: number; rowH: number;
+  pdf: PDFDocument; scrollRef: React.RefObject<HTMLDivElement | null>;
+  selectedPages: Set<number>; selectMode: boolean;
   isReorderMode: boolean;
   onTogglePage: (p: number) => void; onRangeSelect: (s: number, e: number) => void;
   onViewPage?: (p: number) => void; lastClickedRef: React.MutableRefObject<number | null>;
 }) {
+  const totalRows = Math.ceil(displayOrder.length / cols);
+
+  const rowVirtualizer = useVirtualizer({
+    count: totalRows,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => rowH,
+    overscan: 2,
+  });
+
   const handleClick = (pageNum: number, e: React.MouseEvent) => {
     if (isReorderMode) return;
     if (!selectMode) { onViewPage?.(pageNum); return; }
@@ -561,39 +643,57 @@ function GridView({
     }
   };
 
+  const cellStyle = { width: '100%', aspectRatio: `${pageWidth}/${pageHeight}` } as const;
+
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: `repeat(${cols}, 1fr)`,
-      columnGap: 0,
-      rowGap: `${GRID_PAGE_GAP}px`,
-      width: '100%',
-    }}>
-      {displayOrder.map((pageNum, idx) => (
-        <div key={`${pageNum}-${idx}`}
-          onClick={(e) => handleClick(pageNum, e)}
-          className={`relative cursor-pointer overflow-hidden transition-all duration-150 border-2 ${
-            isReorderMode
-              ? 'border-zinc-700 hover:border-amber-500/50'
-              : selectMode && selectedPages.has(pageNum)
-                ? 'border-blue-500 shadow-md shadow-blue-500/20 scale-[0.97] z-10'
-                : 'border-transparent hover:border-zinc-600'
-          }`}
-          style={{ width: '100%', aspectRatio: `${pageWidth}/${pageHeight}` }}
-        >
-          <GridCanvas pdf={pdf} pageNumber={pageNum} scale={scale} />
-          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-zinc-800/90 rounded-full">
-            <span className="text-[9px] font-medium tabular-nums text-zinc-400">{pageNum}</span>
+    <div style={{ height: rowVirtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
+      {rowVirtualizer.getVirtualItems().map(virtualRow => {
+        const rowStartIdx = virtualRow.index * cols;
+        return (
+          <div
+            key={virtualRow.key}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${virtualRow.start}px)`,
+              display: 'grid',
+              gridTemplateColumns: `repeat(${cols}, 1fr)`,
+              rowGap: `${GRID_PAGE_GAP}px`,
+            }}
+          >
+            {Array.from({ length: cols }, (_, colIdx) => {
+              const idx = rowStartIdx + colIdx;
+              if (idx >= displayOrder.length) return <div key={`e-${virtualRow.index}-${colIdx}`} />;
+              const pageNum = displayOrder[idx];
+              const key = `${pageNum}-${idx}`;
+              const cellClass = `relative cursor-pointer overflow-hidden transition-all duration-150 border-2 ${
+                isReorderMode
+                  ? 'border-zinc-700 hover:border-amber-500/50'
+                  : selectMode && selectedPages.has(pageNum)
+                    ? 'border-blue-500 shadow-md shadow-blue-500/20 scale-[0.97] z-10'
+                    : 'border-transparent hover:border-zinc-600'
+              }`;
+              return (
+                <div key={key} onClick={(e) => handleClick(pageNum, e)} className={cellClass} style={cellStyle}>
+                  <GridCanvas pdf={pdf} pageNumber={pageNum} scale={scale} />
+                  <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-zinc-800/90 rounded-full">
+                    <span className="text-[9px] font-medium tabular-nums text-zinc-400">{pageNum}</span>
+                  </div>
+                  {selectMode && selectedPages.has(pageNum) && (
+                    <div className="absolute top-1 left-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow">
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          {selectMode && selectedPages.has(pageNum) && (
-            <div className="absolute top-1 left-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow">
-              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -608,7 +708,7 @@ function GridCanvas({ pdf, pageNumber, scale }: { pdf: PDFDocument; pageNumber: 
     const last = lastRenderedRef.current;
     if (last.page === pageNumber && last.scale === scale) return;
     lastRenderedRef.current = { page: pageNumber, scale };
-    renderPageToCanvas(pdf, pageNumber, canvas, scale).catch(() => {});
+    renderPageWithCache(pdf, pageNumber, canvas, scale).catch(() => {});
   }, [pdf, pageNumber, scale]);
 
   // !w-full !h-full override inline pixel sizes set by renderPageToCanvas

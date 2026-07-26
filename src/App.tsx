@@ -1,7 +1,7 @@
 import { useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import { TopBar } from './components/TopBar';
 import { DrawerMenu, DrawerSection, DrawerItem, DrawerAction } from './components/DrawerMenu';
-import { BottomToolbar, BottomToolbarButton } from './components/BottomToolbar';
+import { BottomToolbar, BottomToolbarButton, BottomToolbarSelect, BottomToolbarRotate } from './components/BottomToolbar';
 import { PDFUploader } from './components/PDFUploader';
 import { UnifiedViewer } from './components/UnifiedViewer';
 import { TOCPanel } from './components/TOCPanel';
@@ -76,7 +76,7 @@ const DOC_TOOLS = [
 // ── App ──────────────────────────────────────────────────────
 
 export default function App() {
-  const { isMobile, isDesktop } = useResponsiveLayout();
+  const { isMobile, isDesktop, isCompact } = useResponsiveLayout();
   const { pdf, pdfBytes, numPages, loading, error, fileName, originalFileName, isModified, loadPDFFromFile, loadPDFFromBytes } = usePDFLoader();
   const { selectedPages, togglePage, selectAll, deselectAll, selectRange, selectedCount } = usePageSelection();
   const reorder = useReorder();
@@ -96,6 +96,9 @@ export default function App() {
   const [editorCurrentPage, setEditorCurrentPage] = useState(1);
   const [swapPageA, setSwapPageA] = useState('');
   const [swapPageB, setSwapPageB] = useState('');
+  const [rotation, setRotation] = useState(0);
+  const rotateCW  = () => setRotation(r => (r + 90) % 360);
+  const rotateCCW = () => setRotation(r => (r + 270) % 360);
 
   useEffect(() => { setDrawerOpen(isDesktop); }, [isDesktop]);
 
@@ -577,16 +580,18 @@ export default function App() {
               onSelectAll={() => selectAll(numPages)} onDeselectAll={deselectAll}
               onViewPage={handleViewPage}
               isReorderMode={isReorderMode} pageOrder={reorder.pageOrder}
-              onReorderSwap={handleReorderSwap}
+              onReorderSwap={handleReorderSwap} rotation={rotation}
+              onRotateCW={rotateCW} onRotateCCW={rotateCCW}
               initialPage={lastViewerPageRef.current} />
           )}
         </div>
       </div>
 
-      <BottomToolbar visible={isMobile && hasPDF}>
+      <BottomToolbar visible={isCompact && hasPDF}>
         <BottomToolbarButton icon="M4 6h16M4 10h16M4 14h16M4 18h16" label="Contents" active={tocOpen} onClick={() => setTocOpen(!tocOpen)} />
+        <BottomToolbarSelect selectMode={selectMode} onToggle={() => setSelectMode(!selectMode)} selectedCount={selectedCount} onSelectAll={() => selectAll(numPages)} onDeselectAll={deselectAll} />
+        <BottomToolbarRotate onRotateCCW={rotateCCW} onRotateCW={rotateCW} />
         <BottomToolbarButton icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" label="Tools" badge={selectedCount > 0 ? String(selectedCount) : undefined} onClick={() => setDrawerOpen(!drawerOpen)} />
-        <BottomToolbarButton icon="M3 4h6v5H3zm11 0h6v5h-6zm-11 8h6v5H3zm11 0h6v5h-6z" label="Select" active={selectMode} onClick={() => setSelectMode(!selectMode)} />
       </BottomToolbar>
 
       {/* TOC Loading Toast */}
