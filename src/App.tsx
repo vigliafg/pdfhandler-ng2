@@ -91,6 +91,15 @@ export default function App() {
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [showDownloadConfirm, setShowDownloadConfirm] = useState(false);
   const [activePageTool, setActivePageTool] = useState<string | null>(null);
+  const tocNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up pending TOC navigation timer on unmount
+  useEffect(() => {
+    return () => {
+      if (tocNavTimerRef.current) clearTimeout(tocNavTimerRef.current);
+    };
+  }, []);
+
   const lastViewerPageRef = useRef(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editorCurrentPage, setEditorCurrentPage] = useState(1);
@@ -485,8 +494,16 @@ export default function App() {
 
   // ── Navigation ────────────────────────────────────────────
 
+  // TOC navigation: defer scrollToPage until after the TOC panel closes
+  // and the layout stabilizes (ResizeObserver debounce is 50ms, we wait 100ms
+  // to be safe). This mimics the manual workaround: close TOC → wait → jump.
   const handleTOCNavigate = useCallback((page: number) => {
-    setScrollToPage(page); setTocOpen(false);
+    setTocOpen(false);
+    if (tocNavTimerRef.current) clearTimeout(tocNavTimerRef.current);
+    tocNavTimerRef.current = setTimeout(() => {
+      setScrollToPage(page);
+      tocNavTimerRef.current = null;
+    }, 100);
   }, []);
   const handleViewPage = useCallback((page: number) => {
     setScrollToPage(page);

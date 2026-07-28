@@ -37,6 +37,7 @@ export function ViewerPanel({ pdf, numPages, scrollToPage, onCurrentPageChange }
   const [fitMode, setFitMode] = useState<'width' | 'auto'>('width');
   const lastReportedPageRef = useRef(1);
   const lastHandledScrollToRef = useRef<number | null>(null);
+  const lastLayoutRef = useRef({ cols: 0, rowH: 0 });
 
   const cols = viewMode === 'single' ? 1 : viewMode === 'double' ? 2 : 3;
 
@@ -83,11 +84,13 @@ export function ViewerPanel({ pdf, numPages, scrollToPage, onCurrentPageChange }
   // ── Scroll-to-page ───────────────────────────────────────
   useEffect(() => {
     if (scrollToPage == null || !loaded || !scrollRef.current) return;
-    if (scrollToPage === lastHandledScrollToRef.current) return;
+    const layoutChanged = lastLayoutRef.current.cols !== cols || lastLayoutRef.current.rowH !== rowH;
+    lastLayoutRef.current = { cols, rowH };
+    if (scrollToPage === lastHandledScrollToRef.current && !layoutChanged) return;
     const p = Math.max(1, Math.min(scrollToPage, numPages));
     const row = Math.floor((p - 1) / cols);
     const target = row * rowH;
-    if (Math.abs(scrollRef.current.scrollTop - target) < 2) return;
+    if (Math.abs(scrollRef.current.scrollTop - target) < 2 && !layoutChanged) return;
     lastHandledScrollToRef.current = scrollToPage;
     scrollRef.current.scrollTop = target;
     setCurrentPage(p);

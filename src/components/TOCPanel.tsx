@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getOutline } from '../../src/lib/pdfRenderer';
 import type { PDFDocument, TOCItem } from '../../src/lib/pdfRenderer';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -16,26 +16,40 @@ export function TOCPanel({ pdf, open, onClose, onNavigate }: TOCPanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['root']));
+  const [showToast, setShowToast] = useState(false);
+
+  // Auto-dismiss toast after 5 seconds
+  useEffect(() => {
+    if (!showToast) return;
+    const timer = setTimeout(() => setShowToast(false), 5000);
+    return () => clearTimeout(timer);
+  }, [showToast]);
 
   // Suppress unused var warning
   void (expanded as unknown);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setShowToast(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     getOutline(pdf)
-      .then(setItems)
+      .then((loadedItems) => {
+        setItems(loadedItems);
+        if (loadedItems.length > 0) setShowToast(true);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load outline'))
       .finally(() => setLoading(false));
   }, [pdf, open]);
 
   if (!open) return null;
 
-  const handleNavigate = (page: number) => {
+  const handleNavigate = useCallback((page: number) => {
     onNavigate(page);
     if (isMobile) onClose();
-  };
+  }, [onNavigate, isMobile, onClose]);
 
   const toggleExpand = (path: string) => {
     setExpanded(prev => {
@@ -76,6 +90,21 @@ export function TOCPanel({ pdf, open, onClose, onNavigate }: TOCPanelProps) {
           <TOCTree items={items} path="root" expanded={expanded} onToggle={toggleExpand} onNavigate={handleNavigate} />
         )}
       </div>
+
+      {/* Layout warning toast */}
+      {showToast && (
+        <div className="shrink-0 mx-2 mb-2 px-3 py-2.5 bg-amber-900/50 border border-amber-700/40 rounded-lg text-[11px] text-amber-200 leading-relaxed animate-slide-up">
+          <div className="flex items-start gap-2">
+            <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <div className="flex-1">
+              <p className="font-semibold mb-0.5">Seleziona prima il layout</p>
+              <p>Scegli il layout (Single, Double, Triple, Grid) prima di cliccare una voce del TOC. Se cambi layout dopo, dovrai riselezionare la voce per ritrovare la pagina.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 
