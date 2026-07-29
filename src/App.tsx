@@ -102,6 +102,16 @@ export default function App() {
 
   const hasPDF = pdf !== null && numPages > 0;
 
+  // ── Debug: auto-load test PDF via ?debug=1 ───────────────
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('debug') !== '1') return;
+    fetch('/hreview.pdf')
+      .then(r => r.blob())
+      .then(blob => handleFileSelect(new File([blob], 'hreview.pdf', { type: 'application/pdf' })))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const swapANum = parseInt(swapPageA, 10);
   const swapBNum = parseInt(swapPageB, 10);
   const canSwap = !isNaN(swapANum) && swapANum >= 1 && swapANum <= numPages &&
