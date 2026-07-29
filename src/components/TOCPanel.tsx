@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { getOutline } from '../../src/lib/pdfRenderer';
 import type { PDFDocument, TOCItem } from '../../src/lib/pdfRenderer';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -44,8 +45,6 @@ export function TOCPanel({ pdf, open, onClose, onNavigate }: TOCPanelProps) {
       .finally(() => setLoading(false));
   }, [pdf, open]);
 
-  if (!open) return null;
-
   const handleNavigate = useCallback((page: number) => {
     onNavigate(page);
     if (isMobile) onClose();
@@ -58,6 +57,8 @@ export function TOCPanel({ pdf, open, onClose, onNavigate }: TOCPanelProps) {
       return next;
     });
   };
+
+  if (!open) return null;
 
   const content = (
     <>
@@ -110,7 +111,7 @@ export function TOCPanel({ pdf, open, onClose, onNavigate }: TOCPanelProps) {
 
   // Mobile: bottom sheet
   if (isMobile) {
-    return (
+    return createPortal(
       <div className="bottom-sheet animate-fade-in">
         <div className="bottom-sheet-backdrop" onClick={onClose} />
         <div className="bottom-sheet-panel" style={{ maxHeight: '70vh' }}>
@@ -119,18 +120,20 @@ export function TOCPanel({ pdf, open, onClose, onNavigate }: TOCPanelProps) {
             {content}
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
   // Desktop: overlay panel (right side, like drawer is on the left)
-  return (
+  return createPortal(
     <>
       <div className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-y-0 right-0 z-40 w-72 shadow-2xl bg-zinc-900 flex flex-col animate-slide-in-right border-l border-zinc-700">
         {content}
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 

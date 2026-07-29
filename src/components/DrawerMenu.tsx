@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface DrawerMenuProps {
   isOpen: boolean;
@@ -9,7 +10,7 @@ interface DrawerMenuProps {
 export function DrawerMenu({ isOpen, onClose, children }: DrawerMenuProps) {
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <>
       {/* Overlay backdrop */}
       <div
@@ -39,7 +40,8 @@ export function DrawerMenu({ isOpen, onClose, children }: DrawerMenuProps) {
           {children}
         </div>
       </nav>
-    </>
+    </>,
+    document.body
   );
 }
 
