@@ -168,6 +168,20 @@ export function UnifiedViewer({
     return () => { if (goToPageRef) goToPageRef.current = null; };
   }, [goToPage, goToPageRef]);
 
+  // ── Re-anchor on layout change ───────────────────────────
+  // When rowH or cols change (layout switch, resize), recalculate
+  // scrollTop so the current page stays visible in the viewport.
+  // Uses lastReportedPageRef (always the page the user sees) not a
+  // nav-only ref, so it won't snap back after manual scroll.
+  // useLayoutEffect runs synchronously before paint — no visual flash.
+  useLayoutEffect(() => {
+    if (!loaded || !scrollRef.current || rowH <= 0) return;
+    if (!scrolledToInitialRef.current) return; // let initial scroll happen first
+    const p = lastReportedPageRef.current;
+    const row = Math.floor((p - 1) / cols);
+    scrollRef.current.scrollTop = row * rowH;
+  }, [rowH, cols, loaded]);
+
   const prevPage = () => goToPage(currentPage - cols);
   const nextPage = () => goToPage(currentPage + cols);
 
@@ -189,7 +203,9 @@ export function UnifiedViewer({
     if (!loaded || !scrollRef.current || initialPage == null || scrolledToInitialRef.current) return;
     if (containerWidth <= 0) return;
     scrolledToInitialRef.current = true;
-    const row = Math.floor((initialPage - 1) / cols);
+    const p = Math.max(1, Math.min(initialPage, numPages));
+    lastReportedPageRef.current = p;
+    const row = Math.floor((p - 1) / cols);
     scrollRef.current.scrollTop = row * rowH;
   }, [loaded, initialPage, cols, rowH, containerWidth]);
 
