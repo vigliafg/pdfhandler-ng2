@@ -173,13 +173,18 @@ export function UnifiedViewer({
   // scrollTop so the current page stays visible in the viewport.
   // Uses lastReportedPageRef (always the page the user sees) not a
   // nav-only ref, so it won't snap back after manual scroll.
-  // useLayoutEffect runs synchronously before paint — no visual flash.
-  useLayoutEffect(() => {
+  // useEffect + rAF ensures GridView's useVirtualizer has mounted
+  // and sized itself before we touch scroll position.
+  useEffect(() => {
     if (!loaded || !scrollRef.current || rowH <= 0) return;
     if (!scrolledToInitialRef.current) return; // let initial scroll happen first
     const p = lastReportedPageRef.current;
     const row = Math.floor((p - 1) / cols);
-    scrollRef.current.scrollTop = row * rowH;
+    const target = row * rowH;
+    const id = requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = target;
+    });
+    return () => cancelAnimationFrame(id);
   }, [rowH, cols, loaded]);
 
   const prevPage = () => goToPage(currentPage - cols);
