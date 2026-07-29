@@ -1,4 +1,4 @@
-const CACHE = 'pdfhandler-v1';
+const CACHE = 'pdfhandler-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -13,13 +13,15 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // Network-first: always try network, fall back to cache only when offline.
+  // This prevents stale cached assets during development (Vite HMR).
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(resp => {
+    fetch(e.request).then(resp => {
       if (resp.ok) {
         const clone = resp.clone();
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return resp;
-    }))
+    }).catch(() => caches.match(e.request))
   );
 });

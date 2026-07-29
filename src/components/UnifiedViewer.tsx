@@ -11,7 +11,6 @@ type LayoutMode = 'single' | 'double' | 'triple' | 'grid';
 interface UnifiedViewerProps {
   pdf: PDFDocument;
   numPages: number;
-  scrollToPage?: number | null;
   onCurrentPageChange?: (page: number) => void;
   // Selection — controlled by parent
   selectMode: boolean;
@@ -31,6 +30,8 @@ interface UnifiedViewerProps {
   rotation: number;
   onRotateCW: () => void;
   onRotateCCW: () => void;
+  // Imperative navigate — populated with goToPage, same function the "go to page" box uses
+  goToPageRef?: React.MutableRefObject<((page: number) => void) | null>;
 }
 
 const PAGE_GAP = 12;
@@ -48,12 +49,13 @@ const LAYOUT_MODES: { id: LayoutMode; label: string; icon: string }[] = [
 // ── UnifiedViewer ───────────────────────────────────────────
 
 export function UnifiedViewer({
-  pdf, numPages, scrollToPage, onCurrentPageChange,
+  pdf, numPages, onCurrentPageChange,
   selectMode, onSelectModeChange,
   selectedPages, selectedCount, onTogglePage, onRangeSelect,
   onSelectAll, onDeselectAll, onViewPage, initialPage,
   isReorderMode, pageOrder,
   rotation, onRotateCW, onRotateCCW,
+  goToPageRef,
 }: UnifiedViewerProps) {
   const { isMobile, isCompact } = useResponsiveLayout();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -67,8 +69,6 @@ export function UnifiedViewer({
   const [fitMode, setFitMode] = useState<'width' | 'auto'>('width');
   const [gridCols, setGridCols] = useState(isMobile ? 3 : 5);
   const lastReportedPageRef = useRef(1);
-  const lastHandledScrollToRef = useRef<number | null>(null);
-  const lastLayoutRef = useRef({ cols: 0, rowH: 0 });
 
   const isGrid = layout === 'grid';
   const cols = isGrid ? gridCols : layout === 'single' ? 1 : layout === 'double' ? 2 : 3;
@@ -135,22 +135,6 @@ export function UnifiedViewer({
     ? cols * pageWidth * effectiveScale
     : cols * pageWidth * effectiveScale + (cols - 1) * COL_GAP + 32;
 
-  // ── Scroll-to-page ───────────────────────────────────────
-  useEffect(() => {
-    if (scrollToPage == null || !loaded || !scrollRef.current) return;
-    const layoutChanged = lastLayoutRef.current.cols !== cols || lastLayoutRef.current.rowH !== rowH;
-    lastLayoutRef.current = { cols, rowH };
-    if (scrollToPage === lastHandledScrollToRef.current && !layoutChanged) return;
-    const p = Math.max(1, Math.min(scrollToPage, numPages));
-    const row = Math.floor((p - 1) / cols);
-    const target = row * rowH;
-    if (Math.abs(scrollRef.current.scrollTop - target) < 2 && !layoutChanged) return;
-    lastHandledScrollToRef.current = scrollToPage;
-    scrollRef.current.scrollTop = target;
-    setCurrentPage(p);
-    lastReportedPageRef.current = p;
-  }, [scrollToPage, loaded, numPages, cols, rowH]);
-
   // ── Scroll handler ───────────────────────────────────────
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
@@ -177,6 +161,13 @@ export function UnifiedViewer({
     setCurrentPage(p);
     lastReportedPageRef.current = p;
   }, [numPages, cols, rowH]);
+
+  // Expose goToPage so TOC navigation works exactly like the "go to page" box
+  useEffect(() => {
+    if (goToPageRef) goToPageRef.current = goToPage;
+    return () => { if (goToPageRef) goToPageRef.current = null; };
+  }, [goToPage, goToPageRef]);
+
   const prevPage = () => goToPage(currentPage - cols);
   const nextPage = () => goToPage(currentPage + cols);
 

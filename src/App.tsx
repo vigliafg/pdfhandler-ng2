@@ -76,31 +76,22 @@ const DOC_TOOLS = [
 // ── App ──────────────────────────────────────────────────────
 
 export default function App() {
-  const { isMobile, isDesktop, isCompact } = useResponsiveLayout();
+  const { isCompact } = useResponsiveLayout();
   const { pdf, pdfBytes, numPages, loading, error, fileName, originalFileName, isModified, loadPDFFromFile, loadPDFFromBytes } = usePDFLoader();
   const { selectedPages, togglePage, selectAll, deselectAll, selectRange, selectedCount } = usePageSelection();
   const reorder = useReorder();
   const { toasts, showToast } = useToast();
-  const [drawerOpen, setDrawerOpen] = useState(isDesktop);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
   const [executing, setExecuting] = useState(false);
   const executingRef = useRef(false);
   const [pendingEncryptedBytes, setPendingEncryptedBytes] = useState<ArrayBuffer | null>(null);
-  const [scrollToPage, setScrollToPage] = useState<number | null>(null);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [showDownloadConfirm, setShowDownloadConfirm] = useState(false);
   const [activePageTool, setActivePageTool] = useState<string | null>(null);
-  const tocNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Clean up pending TOC navigation timer on unmount
-  useEffect(() => {
-    return () => {
-      if (tocNavTimerRef.current) clearTimeout(tocNavTimerRef.current);
-    };
-  }, []);
-
   const lastViewerPageRef = useRef(1);
+  const goToPageRef = useRef<((page: number) => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editorCurrentPage, setEditorCurrentPage] = useState(1);
   const [swapPageA, setSwapPageA] = useState('');
@@ -108,8 +99,6 @@ export default function App() {
   const [rotation, setRotation] = useState(0);
   const rotateCW  = () => setRotation(r => (r + 90) % 360);
   const rotateCCW = () => setRotation(r => (r + 270) % 360);
-
-  useEffect(() => { setDrawerOpen(isDesktop); }, [isDesktop]);
 
   const hasPDF = pdf !== null && numPages > 0;
 
@@ -472,13 +461,13 @@ export default function App() {
     if (id === 'reorder') { toolReorder(); return; }
     if (PAGE_MODAL_IDS.has(id as PageModalId)) {
       tool.openPageModal(id as PageModalId);
-      if (isMobile) setDrawerOpen(false);
+      setDrawerOpen(false);
       return;
     }
-    if (DOC_MODAL_IDS[id]) { doc.openModal(DOC_MODAL_IDS[id]); if (isMobile) setDrawerOpen(false); return; }
+    if (DOC_MODAL_IDS[id]) { doc.openModal(DOC_MODAL_IDS[id]); setDrawerOpen(false); return; }
     DOC_INSTANT[id]?.();
-    if (isMobile) setDrawerOpen(false);
-  }, [tool, doc, isMobile, toolReorder, toolExportImages, toolExtractText]);
+    setDrawerOpen(false);
+  }, [tool, doc, toolReorder, toolExportImages, toolExtractText]);
 
   // ── Reorder apply ─────────────────────────────────────────
 
@@ -498,15 +487,11 @@ export default function App() {
   // and the layout stabilizes (ResizeObserver debounce is 50ms, we wait 100ms
   // to be safe). This mimics the manual workaround: close TOC → wait → jump.
   const handleTOCNavigate = useCallback((page: number) => {
+    goToPageRef.current?.(page);
     setTocOpen(false);
-    if (tocNavTimerRef.current) clearTimeout(tocNavTimerRef.current);
-    tocNavTimerRef.current = setTimeout(() => {
-      setScrollToPage(page);
-      tocNavTimerRef.current = null;
-    }, 100);
   }, []);
   const handleViewPage = useCallback((page: number) => {
-    setScrollToPage(page);
+    goToPageRef.current?.(page);
     setEditorCurrentPage(page);
   }, []);
   const handleReorderSwap = useCallback((a: number, b: number) => reorder.swapPages(a, b), [reorder]);
@@ -531,9 +516,9 @@ export default function App() {
         <div className="border-t border-zinc-800 my-1" />
         <DrawerItem icon="M4 6h16M4 10h16M4 14h16M4 18h16M8 6v12" label="Select All"
           badge={selectedCount > 0 ? String(selectedCount) : undefined}
-          onClick={() => { selectAll(numPages); if (isMobile) setDrawerOpen(false); }} />
+          onClick={() => { selectAll(numPages); setDrawerOpen(false); }} />
         <DrawerItem icon="M6 18L18 6M6 6l12 12" label="Deselect All"
-          onClick={() => { deselectAll(); if (isMobile) setDrawerOpen(false); }} />
+          onClick={() => { deselectAll(); setDrawerOpen(false); }} />
       </DrawerSection>
       <DrawerSection label="Document Tools" color="emerald" defaultOpen={false}>
         {DOC_TOOLS.map(t => (
@@ -543,11 +528,11 @@ export default function App() {
       </DrawerSection>
       <DrawerSection label="Navigation" color="blue" defaultOpen={false}>
         <DrawerItem icon="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" label="Download"
-          onClick={() => { setShowDownloadConfirm(true); if (isMobile) setDrawerOpen(false); }} />
+          onClick={() => { setShowDownloadConfirm(true); setDrawerOpen(false); }} />
         <DrawerItem icon="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-2l-2-2H9L7 5H5a2 2 0 00-2 2z" label="Open PDF"
-          onClick={() => { handleOpenFile(); if (isMobile) setDrawerOpen(false); }} />
+          onClick={() => { handleOpenFile(); setDrawerOpen(false); }} />
         <DrawerItem icon="M4 6h16M4 10h16M4 14h16M4 18h16" label="Contents"
-          onClick={() => { setTocOpen(!tocOpen); if (isMobile) setDrawerOpen(false); }} />
+          onClick={() => { setTocOpen(!tocOpen); setDrawerOpen(false); }} />
       </DrawerSection>
       {pendingEncryptedBytes && (
         <DrawerSection label="Security" color="emerald">
@@ -589,7 +574,8 @@ export default function App() {
             <PDFUploader onFileSelect={handleFileSelect} loading={loading} error={error} />
           ) : (
             <UnifiedViewer
-              pdf={pdf!} numPages={numPages} scrollToPage={scrollToPage}
+              pdf={pdf!} numPages={numPages}
+              goToPageRef={goToPageRef}
               onCurrentPageChange={p => { lastViewerPageRef.current = p; setEditorCurrentPage(p); }}
               selectMode={selectMode} onSelectModeChange={setSelectMode}
               selectedPages={selectedPages} selectedCount={selectedCount}
