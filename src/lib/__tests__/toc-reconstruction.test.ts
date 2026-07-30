@@ -313,7 +313,7 @@ describe('REORDER / SWAP operations', () => {
     const total = 300;
 
     const newOrder: number[] = [];
-    for (let i = 2; i <= totalPages; i++) newOrder.push(i);
+    for (let i = 2; i <= total; i++) newOrder.push(i);
     newOrder.push(1); // page 1 goes to the end
 
     const mapping = computeReorderMapping(newOrder);
