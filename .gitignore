@@ -3,3 +3,4 @@ dist/
 .wrangler/
 *.tsbuildinfo
 wrangler.jsonc
+src/public/hreview.pdf
