@@ -6,7 +6,7 @@ import { renderPageWithCache, clearBitmapCache } from '../lib/bitmapCache';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { PDFDocument } from '../lib/pdfRenderer';
 
-type LayoutMode = 'single' | 'double' | 'triple' | 'grid';
+type PagesPerRow = 1 | 2 | 3 | 4 | 5 | 6;
 
 interface UnifiedViewerProps {
   pdf: PDFDocument;
@@ -39,12 +39,11 @@ const COL_GAP = 10;
 const POOL_SIZE = 12;
 const GRID_PAGE_GAP = 4;
 
-const LAYOUT_MODES: { id: LayoutMode; label: string; icon: string }[] = [
-  { id: 'single', label: 'Single', icon: 'M4 4h16v16H4z' },
-  { id: 'double', label: 'Double', icon: 'M4 4h7v16H4z M13 4h7v16h-7z' },
-  { id: 'triple', label: '3-Col', icon: 'M4 4h4v16H4z M10 4h4v16h-4z M16 4h4v16h-4z' },
-  { id: 'grid', label: 'Grid', icon: 'M4 4h4v7H4z M10 4h4v7h-4z M16 4h4v7h-4z M4 13h4v7H4z M10 13h4v7h-4z M16 13h4v7h-4z' },
-];
+const PAGE_ICONS: Record<number, string> = {
+  1: 'M4 4h16v16H4z',
+  2: 'M4 4h7v16H4z M13 4h7v16h-7z',
+  3: 'M4 4h4v16H4z M10 4h4v16h-4z M16 4h4v16h-4z',
+};
 
 // ── UnifiedViewer ───────────────────────────────────────────
 
@@ -57,21 +56,20 @@ export function UnifiedViewer({
   rotation, onRotateCW, onRotateCCW,
   goToPageRef,
 }: UnifiedViewerProps) {
-  const { isMobile, isCompact } = useResponsiveLayout();
+  const { isCompact } = useResponsiveLayout();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pageWidth, setPageWidth] = useState(595);
   const [pageHeight, setPageHeight] = useState(842);
   const [containerWidth, setContainerWidth] = useState(400);
   const [loaded, setLoaded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [layout, setLayout] = useState<LayoutMode>(isMobile ? 'single' : 'single');
+  const [pagesPerRow, setPagesPerRow] = useState<PagesPerRow>(1);
   const [zoom, setZoom] = useState(100);
   const [fitMode, setFitMode] = useState<'width' | 'auto'>('width');
-  const [gridCols, setGridCols] = useState(isMobile ? 3 : 5);
   const lastReportedPageRef = useRef(1);
 
-  const isGrid = layout === 'grid';
-  const cols = isGrid ? gridCols : layout === 'single' ? 1 : layout === 'double' ? 2 : 3;
+  const isGrid = pagesPerRow >= 4;
+  const cols = pagesPerRow;
 
   // ── Init ──────────────────────────────────────────────────
   useEffect(() => {
@@ -231,37 +229,8 @@ export function UnifiedViewer({
       {/* ── Unified Toolbar ────────────────────────────────── */}
       <div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 px-1.5 sm:px-2 py-1 sm:py-1.5 bg-zinc-900 border-b border-zinc-800 shrink-0 overflow-x-auto scrollbar-thin">
 
-        {/* Layout mode — dropdown on compact, buttons on desktop */}
-        {isCompact ? (
-          <LayoutDropdown layout={layout} onSelect={(id) => { setLayout(id); setFitMode('width'); }} />
-        ) : (
-          <div className="flex items-center bg-zinc-800 rounded-lg p-0.5 border border-zinc-700 shrink-0">
-            {LAYOUT_MODES.map(lm => (
-              <button key={lm.id} onClick={() => { setLayout(lm.id); setFitMode('width'); }}
-                className={`min-w-[36px] sm:min-w-[44px] min-h-[36px] sm:min-h-[44px] px-1 sm:px-1.5 py-0.5 rounded-md transition-all ${
-                  layout === lm.id ? 'bg-zinc-100 text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 active:bg-zinc-700'
-                }`}
-                title={lm.label} aria-label={lm.label}>
-                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d={lm.icon} />
-                </svg>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Grid columns (only in grid mode) */}
-        {isGrid && (
-          <div className="flex items-center bg-zinc-800 rounded-lg p-0.5 border border-zinc-700 shrink-0">
-            {(isMobile ? [2, 3, 4] : [3, 4, 5, 6]).map(n => (
-              <button key={n} onClick={() => setGridCols(n)}
-                className={`min-w-[28px] sm:min-w-[36px] min-h-[28px] sm:min-h-[36px] px-1 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold rounded-md transition-all ${
-                  gridCols === n ? 'bg-zinc-100 text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 active:bg-zinc-700'
-                }`}>{n}</button>
-            ))}
-          </div>
-        )}
-        {isGrid && <div className="w-px h-5 bg-zinc-700 shrink-0" />}
+        {/* Pages per row — single unified segmented control */}
+        <PagesPerRowControl pagesPerRow={pagesPerRow} isCompact={isCompact} onChange={(n) => { setPagesPerRow(n); if (n < 4) setFitMode('width'); }} />
 
         {/* Zoom (hidden in grid mode) */}
         {!isGrid && <>
@@ -357,7 +326,7 @@ export function UnifiedViewer({
           {isGrid ? (
             <GridView
               displayOrder={displayOrder}
-              cols={gridCols}
+              cols={cols}
               pageWidth={pageWidth}
               pageHeight={pageHeight}
               scale={effectiveScale}
@@ -397,14 +366,58 @@ export function UnifiedViewer({
   );
 }
 
-// ── Layout dropdown (compact screens) ──────────────────────
+// ── Pages Per Row control ────────────────────────────────
+// Desktop: segmented control 1-6. Compact: icon + dropdown.
 
-function LayoutDropdown({ layout, onSelect }: { layout: LayoutMode; onSelect: (id: LayoutMode) => void }) {
+function PagesPerRowControl({ pagesPerRow, isCompact, onChange }: {
+  pagesPerRow: PagesPerRow;
+  isCompact: boolean;
+  onChange: (n: PagesPerRow) => void;
+}) {
+  // Desktop: full segmented control
+  if (!isCompact) {
+    const options = [1, 2, 3, 4, 5, 6];
+    return (
+      <div className="flex items-center bg-zinc-800 rounded-lg p-0.5 border border-zinc-700 shrink-0">
+        {options.map((n) => (
+          <span key={n} className="flex items-center">
+            {n === 4 && <div className="w-px h-4 sm:h-5 bg-zinc-700 mx-0.5" />}
+            <button
+              onClick={() => onChange(n as PagesPerRow)}
+              className={`min-w-[28px] sm:min-w-[36px] min-h-[28px] sm:min-h-[36px] px-1 sm:px-1.5 py-0.5 rounded-md flex items-center justify-center transition-all ${
+                pagesPerRow === n
+                  ? 'bg-zinc-100 text-zinc-900 shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200 active:bg-zinc-700'
+              }`}
+              title={`${n} page${n > 1 ? 's' : ''} per row`}
+              aria-label={`${n} page${n > 1 ? 's' : ''} per row`}
+            >
+              {n <= 3 ? (
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d={PAGE_ICONS[n]} />
+                </svg>
+              ) : (
+                <span className="text-[10px] sm:text-xs font-semibold">{n}</span>
+              )}
+            </button>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  // Compact: dropdown
+  return <PagesPerRowDropdown pagesPerRow={pagesPerRow} onChange={onChange} />;
+}
+
+function PagesPerRowDropdown({ pagesPerRow, onChange }: {
+  pagesPerRow: PagesPerRow;
+  onChange: (n: PagesPerRow) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const current = LAYOUT_MODES.find(l => l.id === layout)!;
 
   useLayoutEffect(() => {
     if (open && btnRef.current) setRect(btnRef.current.getBoundingClientRect());
@@ -421,29 +434,46 @@ function LayoutDropdown({ layout, onSelect }: { layout: LayoutMode; onSelect: (i
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const ALL_OPTIONS = [
+    { n: 1, label: '1 pagina', icon: PAGE_ICONS[1] },
+    { n: 2, label: '2 pagine', icon: PAGE_ICONS[2] },
+    { n: 3, label: '3 pagine', icon: PAGE_ICONS[3] },
+    { n: 4, label: 'Griglia 4', icon: '' },
+    { n: 5, label: 'Griglia 5', icon: '' },
+    { n: 6, label: 'Griglia 6', icon: '' },
+  ];
+
+  // Show the current selection icon or a generic grid icon (4-grid) for 4-6
+  const currentIcon = pagesPerRow <= 3 ? PAGE_ICONS[pagesPerRow] : 'M4 4h4v7H4z M10 4h4v7h-4z M16 4h4v7h-4z M4 13h4v7H4z M10 13h4v7h-4z M16 13h4v7h-4z';
+
   return (
     <div className="relative shrink-0">
       <button ref={btnRef} onClick={() => setOpen(!open)}
         className="flex items-center gap-1 min-w-[36px] min-h-[36px] px-1.5 py-0.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-200 transition-colors">
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d={current.icon} />
+        <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d={currentIcon} />
         </svg>
+        <span className="text-[10px] font-semibold ml-0.5">{pagesPerRow}</span>
         <svg className="w-3 h-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && rect && createPortal(
-        <div ref={dropdownRef} className="fixed z-40 w-36 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 animate-slide-up"
+        <div ref={dropdownRef} className="fixed z-40 w-40 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 animate-slide-up"
           style={{ top: rect.bottom + 4, left: rect.left }}>
-          {LAYOUT_MODES.map(lm => (
-            <button key={lm.id} onClick={() => { onSelect(lm.id); setOpen(false); }}
+          {ALL_OPTIONS.map(opt => (
+            <button key={opt.n} onClick={() => { onChange(opt.n as PagesPerRow); setOpen(false); }}
               className={`flex items-center gap-2 w-full px-3 py-2 text-xs font-medium transition-colors ${
-                layout === lm.id ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
+                pagesPerRow === opt.n ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
               }`}>
-              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d={lm.icon} />
-              </svg>
-              {lm.label}
+              {opt.icon ? (
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d={opt.icon} />
+                </svg>
+              ) : (
+                <span className="w-3.5 h-3.5 shrink-0 flex items-center justify-center text-[11px] font-bold">{opt.n}</span>
+              )}
+              {opt.label}
             </button>
           ))}
         </div>,
@@ -466,8 +496,8 @@ function PageJumpInput({ onGo, numPages }: { onGo: (p: number) => void; numPages
   return (
     <input type="number" min={1} max={numPages} value={val}
       onChange={e => setVal(e.target.value)} onKeyDown={handleKey}
-      placeholder={numPages > 999 ? '…' : String(numPages)}
-      className="w-8 sm:w-10 h-7 sm:h-8 px-0.5 sm:px-1 text-[10px] sm:text-[11px] font-mono bg-zinc-800 border border-zinc-700 rounded-md text-zinc-200 text-center focus:outline-none focus:border-blue-500 placeholder:text-zinc-600" />
+      placeholder={numPages > 99999 ? '…' : String(numPages)}
+      className="w-14 sm:w-16 h-7 sm:h-8 px-1 sm:px-1.5 text-[10px] sm:text-[11px] font-mono bg-zinc-800 border border-zinc-700 rounded-md text-zinc-200 text-center focus:outline-none focus:border-blue-500 placeholder:text-zinc-600 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
   );
 }
 
