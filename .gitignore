@@ -3,4 +3,15 @@ dist/
 .wrangler/
 *.tsbuildinfo
 wrangler.jsonc
+
+# PDF test files (symlinks or local copies)
 src/public/hreview.pdf
+hreview.pdf
+src/assets/*.pdf
+
+# Logs
+dev.log
+dev_server.log
+
+# Screenshots
+*.png
