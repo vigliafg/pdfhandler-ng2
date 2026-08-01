@@ -145,6 +145,47 @@ export async function getFirstPageDimensions(pdf: PDFDocument): Promise<PageDime
   return getPageDimensions(pdf, 1);
 }
 
+/**
+ * Sample the first N pages and return the most common (modal) dimensions.
+ * Handles PDFs with mixed page sizes (e.g. a small cover page followed
+ * by standard pages) without being thrown off by outlier first pages.
+ * Falls back to first page, then to A4 default.
+ */
+export async function getModalPageDimensions(pdf: PDFDocument): Promise<PageDimensions> {
+  const sampleSize = Math.min(10, pdf.numPages);
+  const tally = new Map<string, { dims: PageDimensions; count: number }>();
+
+  for (let i = 1; i <= sampleSize; i++) {
+    try {
+      const dims = await getPageDimensions(pdf, i);
+      const key = `${dims.width.toFixed(1)}x${dims.height.toFixed(1)}`;
+      const entry = tally.get(key);
+      if (entry) {
+        entry.count++;
+      } else {
+        tally.set(key, { dims, count: 1 });
+      }
+    } catch {
+      // skip pages that fail to load
+    }
+  }
+
+  if (tally.size > 0) {
+    let best: { dims: PageDimensions; count: number } | null = null;
+    for (const entry of tally.values()) {
+      if (!best || entry.count > best.count) best = entry;
+    }
+    if (best) return best.dims;
+  }
+
+  // Fallback: try first page, then A4
+  try {
+    return await getPageDimensions(pdf, 1);
+  } catch {
+    return { width: 595, height: 842 };
+  }
+}
+
 /** Clear cached page dimensions (e.g. when loading a new PDF). */
 export function clearPageDimensionsCache(): void {
   pageDimsCache.clear();

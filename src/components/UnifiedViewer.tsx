@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
-import { getFirstPageDimensions, clearPageDimensionsCache } from '../lib/pdfRenderer';
+import { getModalPageDimensions, clearPageDimensionsCache } from '../lib/pdfRenderer';
 import { renderPageWithCache, clearBitmapCache } from '../lib/bitmapCache';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { PDFDocument } from '../lib/pdfRenderer';
@@ -75,7 +75,7 @@ export function UnifiedViewer({
   useEffect(() => {
     clearPageDimensionsCache();
     clearBitmapCache();
-    getFirstPageDimensions(pdf).then((dims) => {
+    getModalPageDimensions(pdf).then((dims) => {
       setPageWidth(dims.width);
       setPageHeight(dims.height);
       setLoaded(true);
@@ -515,7 +515,7 @@ function PageView({
   onTogglePage: (p: number) => void; onRangeSelect: (s: number, e: number) => void;
   onViewPage?: (p: number) => void; lastClickedRef: React.MutableRefObject<number | null>;
 }) {
-  const poolRef = useRef<HTMLCanvasElement[]>([]);
+  const poolRef = useRef<HTMLDivElement[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const renderedRef = useRef<Set<number>>(new Set());
 
@@ -530,13 +530,21 @@ function PageView({
     renderedRef.current.clear();
 
     for (let i = 0; i < POOL_SIZE; i++) {
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'absolute';
+      wrapper.style.display = 'none';
+      wrapper.style.overflow = 'hidden';
+      wrapper.style.background = '#fff';
+      wrapper.style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)';
+      // Center canvas inside wrapper for pages smaller than the slot
+      wrapper.style.justifyContent = 'center';
+      wrapper.style.alignItems = 'center';
       const canvas = document.createElement('canvas');
-      canvas.style.position = 'absolute';
-      canvas.style.display = 'none';
-      canvas.style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)';
-      canvas.style.background = '#fff';
-      containerRef.current.appendChild(canvas);
-      poolRef.current.push(canvas);
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      wrapper.appendChild(canvas);
+      containerRef.current.appendChild(wrapper);
+      poolRef.current.push(wrapper);
     }
     doRender();
   }, [scale, numPages, rowH, cols]);
@@ -568,16 +576,17 @@ function PageView({
     let fi = 0;
     for (let p = visibleStartPage; p <= visibleEndPage && fi < freeSlots.length; p++) {
       if (pool.some(c => (c as any).__page === p)) continue;
-      const canvas = freeSlots[fi++];
-      (canvas as any).__page = p;
+      const wrapper = freeSlots[fi++];
+      (wrapper as any).__page = p;
       renderedRef.current.add(p);
       const row = Math.floor(p / cols);
       const col = p % cols;
-      canvas.style.left = `${16 + col * colStep}px`;
-      canvas.style.top = `${row * rowH}px`;
-      canvas.style.width = `${canvasW}px`;
-      canvas.style.height = `${canvasH}px`;
-      canvas.style.display = 'block';
+      wrapper.style.left = `${16 + col * colStep}px`;
+      wrapper.style.top = `${row * rowH}px`;
+      wrapper.style.width = `${canvasW}px`;
+      wrapper.style.height = `${canvasH}px`;
+      wrapper.style.display = 'flex';
+      const canvas = wrapper.firstChild as HTMLCanvasElement;
       renderPageWithCache(pdf, p + 1, canvas, scale).catch(() => {});
     }
   }, [pdf, scale, rowH, numPages, cols, scrollRef, canvasW, canvasH, colStep]);
