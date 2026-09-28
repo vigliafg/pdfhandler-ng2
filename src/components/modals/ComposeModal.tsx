@@ -65,6 +65,7 @@ export function ComposeModal({ onClose, onCompose, executing = false }: ComposeM
   const [sources, setSources] = useState<SourceEntry[]>([]);
   const [chunks, setChunks] = useState<Chunk[]>([]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [isFileDrag, setIsFileDrag] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rejectedCount, setRejectedCount] = useState(0);
 
@@ -161,24 +162,59 @@ export function ComposeModal({ onClose, onCompose, executing = false }: ComposeM
   const removeChunk = useCallback((id: string) => {
     setChunks((prev) => prev.filter((c) => c.id !== id));
     if (editingChunkId === id) setEditingChunkId(null);
+    // Indices shift after a removal — reset any in-flight drag state
+    setDragIdx(null);
   }, [editingChunkId]);
 
-  // ── Drag & drop reorder ─────────────────────────────
-  const handleDragStart = (idx: number) => setDragIdx(idx);
+  // ── Drag & drop reorder (the whole row is the drag surface) ──
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
+    setDragIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    // Firefox requires drag data to be set for the drag to start
+    e.dataTransfer.setData('text/plain', String(idx));
+  };
 
   const handleDragOver = (e: React.DragEvent, idx: number) => {
-    e.preventDefault();
+    e.preventDefault(); // required to allow the drop
+    e.dataTransfer.dropEffect = 'move';
     if (dragIdx === null || dragIdx === idx) return;
     setChunks((prev) => {
       const next = [...prev];
       const [moved] = next.splice(dragIdx, 1);
+      // Live-reorder semantics: remove from dragIdx, insert at idx.
+      // Dragging down lands AFTER the hovered row, dragging up BEFORE it.
+      // This keeps dragIdx in sync with the moved item's true position.
       next.splice(idx, 0, moved);
       return next;
     });
     setDragIdx(idx);
   };
 
-  const handleDragEnd = () => setDragIdx(null);
+  const handleDragEnd = () => {
+    setDragIdx(null);
+  };
+
+  // ── External file drop on the drop zone ────────────────────
+  const isFileDragEvent = (e: React.DragEvent) => e.dataTransfer.types.includes('Files');
+
+  const handleZoneDragOver = (e: React.DragEvent) => {
+    if (!isFileDragEvent(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsFileDrag(true);
+  };
+
+  const handleZoneDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setIsFileDrag(false);
+  };
+
+  const handleZoneDrop = (e: React.DragEvent) => {
+    if (!isFileDragEvent(e)) return;
+    e.preventDefault();
+    setIsFileDrag(false);
+    if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
+  };
 
   // ── Edit chunk ──────────────────────────────────────
   const startEditing = useCallback((chunk: Chunk) => {
@@ -275,7 +311,14 @@ export function ComposeModal({ onClose, onCompose, executing = false }: ComposeM
           {/* Drop zone */}
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="relative flex flex-col items-center justify-center h-20 border-2 border-dashed border-zinc-700 rounded-xl cursor-pointer hover:border-purple-500 hover:bg-purple-500/5 transition-all"
+            onDragOver={handleZoneDragOver}
+            onDragLeave={handleZoneDragLeave}
+            onDrop={handleZoneDrop}
+            className={`relative flex flex-col items-center justify-center h-20 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
+              isFileDrag
+                ? 'border-purple-400 bg-purple-500/10'
+                : 'border-zinc-700 hover:border-purple-500 hover:bg-purple-500/5'
+            }`}
           >
             <input
               ref={fileInputRef}
@@ -400,18 +443,16 @@ export function ComposeModal({ onClose, onCompose, executing = false }: ComposeM
                 return (
                   <div
                     key={chunk.id}
+                    draggable={!isEditing}
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDragEnd={handleDragEnd}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors border-l-2 ${colorClass} ${
                       dragIdx === idx ? 'opacity-50 bg-zinc-800' : 'bg-zinc-800/50 hover:bg-zinc-800'
-                    }`}
+                    } ${!isEditing ? 'cursor-grab active:cursor-grabbing' : ''}`}
                   >
-                    {/* Drag handle */}
-                    <div
-                      draggable
-                      onDragStart={() => handleDragStart(idx)}
-                      onDragOver={(e) => handleDragOver(e, idx)}
-                      onDragEnd={handleDragEnd}
-                      className="cursor-grab active:cursor-grabbing shrink-0"
-                    >
+                    {/* Drag handle — visual affordance only: the whole row is draggable */}
+                    <div className="shrink-0">
                       <svg className="w-3 h-3 text-zinc-600" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 6h2v2H8V6zm6 0h2v2h-2V6zM8 11h2v2H8v-2zm6 0h2v2h-2v-2zm-6 5h2v2H8v-2zm6 0h2v2h-2v-2z" />
                       </svg>
