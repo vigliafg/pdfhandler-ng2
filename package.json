@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc -p src/tsconfig.json --noEmit && vite build",
     "lint": "eslint src/",
+    "test:e2e": "node tests/e2e/run.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -175,16 +175,15 @@ export async function duplicatePages(
     const origPages = await newDoc.copyPages(sourceDoc, allIndices);
     for (const page of origPages) newDoc.addPage(page);
 
-    // Copy the selected pages for duplication
-    const dupeIndices = toIndices(pageNumbers);
-    const dupePages = await newDoc.copyPages(sourceDoc, dupeIndices);
-
     // Calculate insertion index (0-based) in the new document
     // dest.page is 1-based in the ORIGINAL document
     const insertIdx = dest.location === 'before' ? dest.page - 1 : dest.page;
 
-    // Insert all copies at the destination (reverse order to maintain position)
+    // Insert all copies at the destination. Each copy must be a DISTINCT
+    // PDFPage instance: re-inserting the same instance with insertPage
+    // corrupts the pages tree (circular reference readable by strict parsers).
     for (let c = 0; c < copies; c++) {
+      const dupePages = await newDoc.copyPages(sourceDoc, toIndices(pageNumbers));
       for (let i = dupePages.length - 1; i >= 0; i--) {
         newDoc.insertPage(insertIdx + c * dupePages.length, dupePages[i]);
       }
